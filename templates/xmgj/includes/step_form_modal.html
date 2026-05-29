@@ -1,0 +1,119 @@
+{% load static %}
+<div class="modal fade" id="stepFormModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border:none;border-radius:14px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden;">
+            <div class="modal-body p-0">
+
+                <!-- 头部 -->
+                <div class="px-4 pt-4 pb-0 d-flex justify-content-between align-items-start">
+                    <div>
+                        <h5 class="modal-title fw-bold" style="color:var(--gray-900);font-size:1.05rem;">
+                            <i class="bi bi-check2-square me-2" style="color:var(--success);"></i>添加步骤
+                        </h5>
+                        <p class="text-muted mb-0" style="font-size:0.8rem;margin-top:2px;" id="stepModalSubtitle">在节点中添加一个新步骤</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" style="font-size:0.8rem;margin-top:4px;"></button>
+                </div>
+
+                <!-- 表单 -->
+                <form method="post" id="stepFormModalForm" class="px-4 pt-3 pb-4" novalidate>
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:0.82rem;color:var(--gray-700);font-weight:600;">
+                            步骤标题 <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" name="title" class="form-control" placeholder="例如：首页UI设计稿" required autofocus
+                               style="font-size:0.88rem;padding:0.55rem 0.75rem;border-radius:8px;">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:0.82rem;color:var(--gray-700);font-weight:600;">
+                            详细描述
+                        </label>
+                        <textarea name="content" class="form-control auto-resize" rows="2" placeholder="补充说明这个步骤需要做什么..."
+                                  style="font-size:0.88rem;padding:0.5rem 0.75rem;border-radius:8px;"></textarea>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label" style="font-size:0.82rem;color:var(--gray-700);font-weight:600;">
+                            状态 <span class="text-danger">*</span>
+                        </label>
+                        <select name="status" class="form-select" required
+                                style="font-size:0.88rem;padding:0.5rem 0.75rem;border-radius:8px;">
+                            <option value="not_started">未开始</option>
+                            <option value="in_progress" selected>进行中</option>
+                            <option value="completed">已完成</option>
+                            <option value="blocked">受阻</option>
+                        </select>
+                    </div>
+
+                    <div class="alert alert-danger mt-3 mb-0" id="stepFormError" style="display:none;font-size:0.82rem;border-radius:8px;padding:8px 12px;">
+                        <i class="bi bi-exclamation-circle me-1"></i>
+                        <span id="stepFormErrorText"></span>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4 pt-3" style="border-top:1px solid var(--gray-100);">
+                        <button type="submit" class="btn btn-primary px-4" id="stepModalSubmit" style="border-radius:8px;padding:0.5rem 1.2rem;">
+                            <i class="bi bi-check-lg me-1"></i> 添加步骤
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary px-3" data-bs-dismiss="modal" style="border-radius:8px;padding:0.5rem 1rem;">
+                            取消
+                        </button>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var modal = document.getElementById('stepFormModal');
+    if (!modal) return;
+    var form = document.getElementById('stepFormModalForm');
+    var submitBtn = document.getElementById('stepModalSubmit');
+    var errorAlert = document.getElementById('stepFormError');
+    var errorText = document.getElementById('stepFormErrorText');
+    var subtitle = document.getElementById('stepModalSubtitle');
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> 添加中...';
+        errorAlert.style.display = 'none';
+
+        var formData = new FormData(form);
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                window.location.href = data.redirect_url;
+            } else {
+                errorText.textContent = data.error || '请检查输入的内容';
+                errorAlert.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i> 添加步骤';
+            }
+        })
+        .catch(function() {
+            errorText.textContent = '网络错误，请重试';
+            errorAlert.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i> 添加步骤';
+        });
+    });
+
+    modal.addEventListener('hidden.bs.modal', function() {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i> 添加步骤';
+        errorAlert.style.display = 'none';
+        form.reset();
+    });
+})();
+</script>

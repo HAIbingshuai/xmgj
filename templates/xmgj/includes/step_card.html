@@ -1,0 +1,155 @@
+{% load xmgj_tags %}
+
+<div class="step-card {% if step.status == 'in_progress' %}expanded{% endif %}" data-step-id="{{ step.pk }}">
+    <div class="step-header">
+        <input type="checkbox" class="step-checkbox"
+               data-url="{% url 'xmgj:step_status_update' step.node.item.pk step.node.pk step.pk %}"
+               {% if step.status == 'completed' %}checked{% endif %}>
+        <div class="step-header-content">
+            <div class="step-header-top">
+                <span class="step-title {% if step.status == 'completed' %}completed{% endif %}">{% if step.title %}{{ step.title }}{% else %}{{ step.content|truncatechars:60 }}{% endif %}</span>
+                <span class="step-status-badge" style="background:{% if step.status == 'completed' %}#D4EDDA;color:#155724{% elif step.status == 'in_progress' %}#FFF3CD;color:#856404{% elif step.status == 'blocked' %}#F8D7DA;color:#721C24{% else %}#E9ECEF;color:#6C757D{% endif %};">{{ step.get_status_display }}</span>
+            </div>
+            <div class="step-meta">
+                {% with total=step.attachment_count|add:step.image_count %}
+                {% if total %}<span><i class="bi bi-paperclip me-1"></i>{{ total }}</span>{% endif %}
+                {% endwith %}
+            </div>
+            <div class="step-preview">{{ step.content }}</div>
+        </div>
+        <span class="step-expand-icon"><i class="bi bi-chevron-down"></i></span>
+    </div>
+    <div class="step-body">
+
+        <!-- ===== 查看模式 ===== -->
+        <div class="step-view-mode">
+            {% if step.title %}
+            <div class="fw-medium mb-1" style="font-size:0.88rem;color:var(--gray-800);">{{ step.title }}</div>
+            {% endif %}
+            {% if step.content %}
+            <div class="step-desc">{{ step.content|linebreaksbr }}</div>
+            {% endif %}
+            {% if step.note %}
+            <div class="result-box {% if step.status == 'blocked' %}problem{% elif step.status == 'not_started' %}empty{% elif step.status == 'in_progress' %}in-progress-result{% endif %}">
+                <i class="bi {% if step.status == 'completed' %}bi-check-circle r-icon" style="color:#28A745{% elif step.status == 'blocked' %}bi-exclamation-triangle r-icon{% elif step.status == 'in_progress' %}bi-hourglass-split r-icon" style="color:#F59E0B{% else %}bi-hourglass-split r-icon" style="color:#9CA3AA{% endif %}"></i>
+                {{ step.note }}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- ===== 编辑模式（默认隐藏） ===== -->
+        <div class="step-edit-mode" style="display:none;">
+            <div class="mb-2">
+                <label style="font-size:0.72rem;font-weight:600;color:#6C757D;margin-bottom:2px;">步骤标题</label>
+                <input type="text" class="form-control form-control-sm step-edit-title" value="{{ step.title }}" style="font-size:0.82rem;">
+            </div>
+            <div class="mb-2">
+                <label style="font-size:0.72rem;font-weight:600;color:#6C757D;margin-bottom:2px;">详细描述</label>
+                <textarea class="form-control form-control-sm step-edit-content" rows="2" style="font-size:0.82rem;">{{ step.content }}</textarea>
+            </div>
+        </div>
+
+        <!-- ===== 按钮栏 ===== -->
+        <div class="step-actions-bar">
+            <!-- 查看模式按钮 -->
+            <div class="step-view-btns">
+                <button class="btn-act primary btn-edit-step"><i class="bi bi-pencil"></i> 编辑</button>
+                {% with total=step.attachment_count|add:step.image_count %}
+                <button class="btn-act" data-bs-toggle="offcanvas" data-bs-target="#fileDrawer-{{ step.pk }}"><i class="bi bi-paperclip"></i> 文件 ({{ total }})</button>
+                {% endwith %}
+            </div>
+            <!-- 编辑模式按钮（默认隐藏） -->
+            <div class="step-edit-btns" style="display:none;">
+                <button class="btn-act primary btn-save-step" data-url="{% url 'xmgj:step_inline_save' step.node.item.pk step.node.pk step.pk %}"><i class="bi bi-check-lg"></i> 保存</button>
+                <button class="btn-act btn-cancel-edit"><i class="bi bi-x-lg"></i> 取消</button>
+                <span class="act-spacer"></span>
+                <a href="{% url 'xmgj:step_edit' step.node.item.pk step.node.pk step.pk %}" class="btn-act" title="在新页面编辑"><i class="bi bi-box-arrow-up-right"></i></a>
+                <a href="{% url 'xmgj:step_delete' step.node.item.pk step.node.pk step.pk %}" class="btn-act" style="color:#DC3545;border-color:#FECACA;" data-confirm-delete data-confirm-msg="确定要删除此步骤吗？"><i class="bi bi-trash3"></i></a>
+            </div>
+            <span class="act-spacer"></span>
+        </div>
+    </div>
+</div>
+
+<!-- 文件抽屉（合并附件+图片，右下弹出） -->
+<div class="offcanvas offcanvas-end offcanvas-drawer" tabindex="-1" id="fileDrawer-{{ step.pk }}">
+    <div class="offcanvas-header">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2" style="color:var(--primary);"></i>文件 · {{ step.title|default:step.content|truncatechars:30 }}</h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body upload-drawer-body" data-upload-url="{% url 'xmgj:file_upload' step.pk %}">
+        <!-- 通用上传区 -->
+        <div class="upload-zone" onclick="this.parentElement.querySelector('.file-input').click()">
+            <i class="bi bi-cloud-arrow-up"></i>
+            <p>点击选择文件或图片 <small>支持多选</small></p>
+        </div>
+        <input type="file" class="file-input" style="display:none;" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.zip">
+        <div class="upload-progress" style="display:none;margin-bottom:10px;">
+            <div class="d-flex justify-content-between small text-muted mb-1" style="font-size:0.72rem;">
+                <span class="upload-filename">上传中...</span>
+                <span class="upload-percent">0%</span>
+            </div>
+            <div class="progress" style="height:3px;border-radius:2px;">
+                <div class="progress-bar upload-progress-bar" style="width:0%;border-radius:2px;"></div>
+            </div>
+        </div>
+
+        <!-- 附件列表 -->
+        {% with files=step.files.all %}
+        <div class="drawer-section-title">附件 ({{ step.attachment_count }})</div>
+        <div class="d-attach-list mb-3">
+            {% for f in files %}
+                {% if f.file_type == 'attachment' %}
+                <div class="d-attach-row" data-file-id="{{ f.pk }}">
+                    <i class="bi bi-file-earmark-{{ f.extension }} d-attach-icon"></i>
+                    <div class="d-attach-info">
+                        <div class="d-attach-name">{{ f.original_name }}</div>
+                        <div class="d-attach-meta">{{ f.extension|upper }} · {{ f.size_display }} · {{ f.created_at|date:"Y-m-d" }}</div>
+                    </div>
+                    <div class="d-attach-actions">
+                        <a href="{{ f.file.url }}" class="da-btn" title="下载" download><i class="bi bi-download"></i></a>
+                        <a href="{% url 'xmgj:file_delete' f.pk %}" class="da-btn danger" title="删除" data-confirm-delete data-confirm-msg="确定要删除文件「{{ f.original_name }}」吗？"><i class="bi bi-trash3"></i></a>
+                    </div>
+                </div>
+                {% endif %}
+            {% empty %}
+            <div class="text-muted text-center py-2" style="font-size:0.78rem;">暂无附件</div>
+            {% endfor %}
+        </div>
+
+        <!-- 图片网格 -->
+        <div class="drawer-section-title">图片 ({{ step.image_count }})</div>
+        <div class="d-img-grid">
+            {% for f in files %}
+                {% if f.file_type == 'image' %}
+                <div class="d-img-item" data-file-id="{{ f.pk }}">
+                    {% if f.extension == 'jpg' or f.extension == 'jpeg' or f.extension == 'png' or f.extension == 'webp' %}
+                    <img src="{{ f.file.url }}" alt="{{ f.original_name }}" style="width:100%;height:100%;object-fit:cover;cursor:pointer;" onclick="previewImage(this.src, '{{ f.original_name }}')">
+                    {% else %}
+                    <span class="d-img-label">{{ f.extension|upper }}</span>
+                    {% endif %}
+                    <a href="{% url 'xmgj:file_delete' f.pk %}" class="d-img-del" data-confirm-delete data-confirm-msg="确定要删除图片吗？"><i class="bi bi-x"></i></a>
+                </div>
+                {% endif %}
+            {% empty %}
+                <div class="text-muted" style="font-size:0.75rem;grid-column:span 4;text-align:center;padding:12px;">暂无图片</div>
+            {% endfor %}
+            <div class="d-img-add" onclick="this.closest('.offcanvas-body').querySelector('input[type=file]').click()"><i class="bi bi-plus"></i></div>
+        </div>
+        {% endwith %}
+        <div class="text-muted mt-2" style="font-size:0.7rem;">支持 PDF、Word、Excel、JPG、PNG 等格式</div>
+    </div>
+</div>
+
+<!-- 图片预览弹窗 -->
+<div class="modal fade" id="imagePreviewModal" tabindex="-1" style="--bs-modal-bg:transparent;">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-fullscreen-md-down">
+        <div class="modal-content" style="background:transparent;border:none;box-shadow:none;">
+            <div class="modal-body text-center p-0 position-relative">
+                <button type="button" class="btn-close btn-close-white position-absolute" style="top:10px;right:10px;z-index:10;opacity:0.8;" data-bs-dismiss="modal"></button>
+                <img id="previewImageEl" src="" alt="预览" style="max-width:100%;max-height:90vh;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+                <div class="mt-2" style="color:rgba(255,255,255,0.6);font-size:0.78rem;" id="previewImageName"></div>
+            </div>
+        </div>
+    </div>
+</div>

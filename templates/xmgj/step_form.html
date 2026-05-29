@@ -1,0 +1,131 @@
+{% extends 'xmgj/base.html' %}
+{% load static %}
+
+{% block title %}{% if object %}编辑步骤{% else %}添加步骤{% endif %} - 项目管家{% endblock %}
+
+{% block content %}
+<div class="form-wrapper">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+
+            <a href="{% url 'xmgj:item_detail' node.item.pk %}?node={{ node.pk }}" class="btn btn-outline-secondary btn-sm mb-3">
+                <i class="bi bi-arrow-left me-1"></i> 返回
+            </a>
+
+            <div class="card border-0 shadow-sm" style="border-radius:12px;">
+                <div class="card-body p-4">
+
+                    <!-- 头部 -->
+                    <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:44px;height:44px;background:#D4EDDA;flex-shrink:0;">
+                            <i class="bi bi-check2-square" style="font-size:1.2rem;color:#28A745;"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0 fw-bold" style="color:#2C3E50;">{% if object %}编辑步骤{% else %}添加步骤{% endif %}</h5>
+                            <span class="text-muted" style="font-size:0.8rem;">
+                                <i class="bi bi-clock-history me-1"></i> {{ node.title }}
+                                <span class="mx-1">·</span>
+                                <i class="bi bi-kanban me-1"></i> {{ node.item.title }}
+                            </span>
+                        </div>
+                        <a href="{% url 'xmgj:item_detail' node.item.pk %}?node={{ node.pk }}" class="btn btn-sm btn-outline-secondary ms-auto">
+                            <i class="bi bi-x-lg"></i>
+                        </a>
+                    </div>
+
+                    <!-- 当前节点信息 -->
+                    <div class="d-flex align-items-center gap-3 p-3 mb-4" style="background:#F8FAFB;border-radius:8px;border:1px solid #F0F0F0;">
+                        <div class="timeline-dot" style="width:16px;height:16px;border-radius:50%;background:{% if node.status == 'completed' %}#28A745{% elif node.status == 'in_progress' %}#FFC107{% else %}#ADB5BD{% endif %};border:3px solid {% if node.status == 'completed' %}#28A745{% elif node.status == 'in_progress' %}#FFC107{% else %}#ADB5BD{% endif %};flex-shrink:0;"></div>
+                        <div style="font-size:0.82rem;">
+                            <div class="fw-medium" style="color:#2C3E50;">{{ node.title }}</div>
+                            <div class="text-muted" style="font-size:0.75rem;">{{ node.summary|default:""|truncatechars:60 }}</div>
+                        </div>
+                        <span class="badge bg-{{ node.status|yesno:'secondary,warning,success,secondary'|cut:'True' }} ms-auto" style="font-size:0.68rem;">{{ node.get_status_display }}</span>
+                    </div>
+
+                    <form method="post" id="stepForm">
+                        {% csrf_token %}
+
+                        <!-- 步骤标题 -->
+                        <div class="mb-3">
+                            <label class="form-label fw-medium" style="font-size:0.85rem;color:#374151;">
+                                步骤标题 <span class="text-danger">*</span>
+                            </label>
+                            {{ form.title }}
+                            {% if form.title.errors %}
+                            <div class="invalid-feedback d-block" style="font-size:0.78rem;">{{ form.title.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- 详细描述 -->
+                        <div class="mb-3">
+                            <label class="form-label fw-medium" style="font-size:0.85rem;color:#374151;">
+                                详细描述
+                            </label>
+                            {{ form.content }}
+                            {% if form.content.errors %}
+                            <div class="invalid-feedback d-block" style="font-size:0.78rem;">{{ form.content.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- 状态 -->
+                        <div class="mb-4">
+                            <label class="form-label fw-medium" style="font-size:0.85rem;color:#374151;">
+                                状态 <span class="text-danger">*</span>
+                            </label>
+                            {{ form.status }}
+                            {% if form.status.errors %}
+                            <div class="invalid-feedback d-block" style="font-size:0.78rem;">{{ form.status.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- 已有步骤列表 -->
+                        {% with steps=node.steps.all %}
+                        {% if steps %}
+                        <div class="mb-4">
+                            <label class="form-label fw-medium" style="font-size:0.82rem;color:#6C757D;">
+                                <i class="bi bi-list-ol me-1"></i> 已有步骤（{{ steps|length }}）
+                            </label>
+                            <div style="background:#FAFBFC;border-radius:8px;border:1px solid #F0F0F0;padding:8px;">
+                                {% for s in steps %}
+                                <div class="d-flex align-items-center gap-2 py-1" style="font-size:0.78rem;color:#4B5563;{% if not forloop.last %}border-bottom:1px solid #F5F5F5;padding-bottom:6px;margin-bottom:6px;{% endif %}">
+                                    <span class="badge" style="font-size:0.6rem;width:8px;height:8px;border-radius:50%;padding:0;background:{% if s.status == 'completed' %}#28A745{% elif s.status == 'blocked' %}#DC3545{% else %}#D1D5DB{% endif %};flex-shrink:0;"></span>
+                                    <span>{{ s.content|truncatechars:50 }}</span>
+                                    <span class="badge bg-{% if s.status == 'completed' %}success{% elif s.status == 'in_progress' %}warning text-dark{% elif s.status == 'blocked' %}danger{% else %}secondary{% endif %} ms-auto" style="font-size:0.6rem;">{{ s.get_status_display }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endwith %}
+
+                        <!-- 操作 -->
+                        <div class="d-flex gap-2 pt-3 border-top">
+                            <button type="submit" class="btn btn-primary px-4" id="submitBtn">
+                                <i class="bi bi-check-lg me-1"></i> {% if object %}保存修改{% else %}添加步骤{% endif %}
+                            </button>
+                            <a href="{% url 'xmgj:item_detail' node.item.pk %}?node={{ node.pk }}" class="btn btn-outline-secondary px-3">取消</a>
+                            {% if object %}
+                            <a href="{% url 'xmgj:step_delete' node.item.pk node.pk object.pk %}" class="btn btn-outline-danger ms-auto" data-confirm-delete data-confirm-msg="确定要删除此步骤吗？">
+                                <i class="bi bi-trash3 me-1"></i> 删除
+                            </a>
+                            {% endif %}
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.getElementById('submitBtn')?.addEventListener('click', function() {
+        this.disabled = true;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> 保存中...';
+        document.getElementById('stepForm').submit();
+    });
+</script>
+{% endblock %}

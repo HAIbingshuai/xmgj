@@ -1,0 +1,127 @@
+{% extends 'xmgj/base.html' %}
+{% load static xmgj_tags %}
+
+{% block title %}事项列表 - 项目管家{% endblock %}
+
+{% block content %}
+<div class="list-wrapper">
+    <!-- 顶部栏 -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0 fw-bold" style="font-size:1.15rem;letter-spacing:-0.3px;">
+            <i class="bi bi-list-task me-2" style="color:var(--primary);"></i>事项列表
+        </h4>
+        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#itemFormModal">
+            <i class="bi bi-plus-lg me-1"></i>新建事项
+        </button>
+    </div>
+
+    <!-- 搜索栏 -->
+    <div class="mb-3">
+        <form method="get" class="d-flex gap-2">
+            <div class="input-group input-group-sm flex-grow-1" style="max-width:320px;">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search" style="color:var(--gray-400);font-size:0.8rem;"></i></span>
+                <input type="text" name="search" class="form-control border-start-0" placeholder="搜索事项标题..." value="{{ request.GET.search }}" style="font-size:0.82rem;">
+            </div>
+            {% if request.GET.search %}
+            <a href="{% url 'xmgj:item_list' %}" class="btn btn-outline-secondary btn-sm">清除</a>
+            {% endif %}
+            <button type="submit" class="btn btn-primary btn-sm px-3" style="display:none;">搜索</button>
+        </form>
+    </div>
+
+    <!-- 状态 Tab 导航 -->
+    <div class="d-flex gap-1 mb-3 flex-wrap">
+        {% url 'xmgj:item_list' as base_url %}
+        <a href="{{ base_url }}" class="btn btn-sm px-3 {% if not request.GET.status %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;font-weight:600;">
+            全部 <span class="ms-1" style="font-size:0.7rem;opacity:0.7;">{{ total_visible }}</span>
+        </a>
+        <a href="{{ base_url }}?status=in_progress" class="btn btn-sm px-3 {% if request.GET.status == 'in_progress' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;font-weight:600;">
+            <i class="bi bi-hourglass-split me-1" style="font-size:0.75rem;"></i>进行中 {% if counts.in_progress %}<span class="ms-1" style="font-size:0.7rem;opacity:0.7;">{{ counts.in_progress }}</span>{% endif %}
+        </a>
+        <a href="{{ base_url }}?status=not_started" class="btn btn-sm px-3 {% if request.GET.status == 'not_started' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;font-weight:600;">
+            <i class="bi bi-circle me-1" style="font-size:0.75rem;"></i>未开始 {% if counts.not_started %}<span class="ms-1" style="font-size:0.7rem;opacity:0.7;">{{ counts.not_started }}</span>{% endif %}
+        </a>
+        <a href="{{ base_url }}?status=completed" class="btn btn-sm px-3 {% if request.GET.status == 'completed' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;font-weight:600;">
+            <i class="bi bi-check-all me-1" style="font-size:0.75rem;"></i>已完成 {% if counts.completed %}<span class="ms-1" style="font-size:0.7rem;opacity:0.7;">{{ counts.completed }}</span>{% endif %}
+        </a>
+        <a href="{{ base_url }}?status=on_hold" class="btn btn-sm px-3 {% if request.GET.status == 'on_hold' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;font-weight:600;">
+            <i class="bi bi-pause-circle me-1" style="font-size:0.75rem;"></i>暂停 {% if counts.on_hold %}<span class="ms-1" style="font-size:0.7rem;opacity:0.7;">{{ counts.on_hold }}</span>{% endif %}
+        </a>
+        <a href="{{ base_url }}?priority=urgent" class="btn btn-sm px-3 {% if request.GET.priority == 'urgent' %}btn-danger{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;font-weight:600;">
+            <i class="bi bi-exclamation-triangle me-1" style="font-size:0.75rem;"></i>紧急
+        </a>
+    </div>
+
+    <!-- 分组内容 -->
+    {% if items %}
+        {% if groups %}
+            {% for group in groups %}
+            <div class="mb-4">
+                <!-- 分组标题 -->
+                <div class="d-flex align-items-center gap-2 mb-2 px-1">
+                    <span style="width:3px;height:18px;border-radius:2px;background:{% if group.status == 'in_progress' %}var(--warning){% elif group.status == 'completed' %}var(--success){% elif group.status == 'on_hold' %}var(--gray-400){% else %}var(--gray-300){% endif %};flex-shrink:0;"></span>
+                    <i class="bi bi-{{ group.icon }}" style="font-size:0.85rem;color:{% if group.status == 'in_progress' %}var(--warning){% elif group.status == 'completed' %}var(--success){% else %}var(--gray-400){% endif %};"></i>
+                    <span class="fw-bold" style="font-size:0.85rem;color:var(--gray-700);">{{ group.label }}</span>
+                    <span class="badge" style="font-size:0.65rem;background:var(--gray-100);color:var(--gray-500);font-weight:600;">{{ group.items|length }}</span>
+                </div>
+
+                <!-- 卡片流 -->
+                <div class="row g-2">
+                    {% for item in group.items %}
+                    <div class="col-xl-3 col-lg-4 col-md-6">
+                        <a href="{% url 'xmgj:item_detail' item.pk %}" class="text-decoration-none">
+                            <div class="item-card">
+                                <div class="card-body" style="padding:0.9rem 1rem;">
+                                    <div class="d-flex align-items-start justify-content-between mb-1">
+                                        <span class="item-title" style="font-size:0.88rem;">{{ item.title }}</span>
+                                    </div>
+                                    <div class="d-flex gap-1 mb-1">
+                                        <span class="badge" style="font-size:0.62rem;font-weight:600;background:{% if item.priority == 'urgent' %}var(--danger-bg);color:#991B1B{% elif item.priority == 'high' %}var(--warning-bg);color:#92400E{% elif item.priority == 'medium' %}var(--primary-bg);color:var(--primary){% else %}var(--gray-100);color:var(--gray-500){% endif %};">{{ item.get_priority_display }}</span>
+                                    </div>
+                                    {% if item.description %}
+                                    <p class="card-text small" style="font-size:0.76rem;color:var(--gray-400);margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;">{{ item.description }}</p>
+                                    {% endif %}
+                                    <div class="d-flex justify-content-between align-items-center pt-1" style="border-top:1px solid var(--gray-50);">
+                                        <span style="font-size:0.7rem;color:var(--gray-400);"><i class="bi bi-diagram-2 me-1"></i>{{ item.timeline_node_count }} 节点</span>
+                                        <span style="font-size:0.7rem;color:var(--gray-400);">{{ item.updated_at|date:"m-d" }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <!-- 筛选无结果 -->
+            <div class="empty-state" style="padding:60px 0;">
+                <i class="bi bi-search"></i>
+                <p>没有找到匹配的事项</p>
+                <a href="{% url 'xmgj:item_list' %}" class="btn btn-outline-secondary btn-sm">查看全部</a>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="empty-state" style="padding:80px 0;">
+            <i class="bi bi-inbox"></i>
+            <p>暂无事项</p>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#itemFormModal">创建第一个事项</button>
+        </div>
+    {% endif %}
+</div>
+
+<!-- 新建事项弹窗 -->
+{% include 'xmgj/includes/item_form_modal.html' %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.getElementById('itemFormModal')?.addEventListener('show.bs.modal', function() {
+        document.getElementById('itemFormModalForm').action = '{% url "xmgj:item_create" %}';
+    });
+    // 搜索框回车自动提交
+    document.querySelector('input[name="search"]')?.addEventListener('keyup', function(e) {
+        if (e.key === 'Enter') this.closest('form').submit();
+    });
+</script>
+{% endblock %}

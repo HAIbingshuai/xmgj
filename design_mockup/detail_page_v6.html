@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>v6 设计稿：事项详情页 - 项目管家</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        html, body { height: 100%; overflow: hidden; background-color: #F0F2F5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .page-wrapper { display: flex; flex-direction: column; height: 100vh; }
+
+        /* ===== 导航栏 ===== */
+        .navbar-xmgj { flex-shrink: 0; background: linear-gradient(135deg, #4A6FA5 0%, #3A5A8C 100%); box-shadow: 0 2px 12px rgba(74,111,165,0.3); padding: 0.45rem 0; }
+        .navbar-xmgj .navbar-brand { font-weight: 700; letter-spacing: 1px; font-size: 1.05rem; }
+        .navbar-xmgj .nav-link { font-size: 0.88rem; padding: 0.35rem 0.75rem !important; }
+
+        /* ===== Header ===== */
+        .header-area { flex-shrink: 0; padding: 8px 0 6px 0; }
+        .compact-header { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); padding: 8px 18px; }
+        .back-link { color: #8C959E; text-decoration: none; font-size: 0.8rem; white-space: nowrap; flex-shrink: 0; }
+        .back-link:hover { color: #4A6FA5; }
+        .header-title-area { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+        .item-title { font-weight: 700; font-size: 1.05rem; color: #2C3E50; white-space: nowrap; }
+        .item-desc { font-size: 0.8rem; color: #9CA3AA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tag { display: inline-block; padding: 0.12em 0.5em; font-size: 0.65rem; font-weight: 600; border-radius: 20px; white-space: nowrap; }
+        .header-divider { width: 1px; height: 20px; background: #E5E7EB; flex-shrink: 0; }
+
+        /* ===== 内容区 ===== */
+        .content-area { flex-grow: 1; overflow: hidden; padding-bottom: 8px; }
+        .content-area .row { height: 100%; margin: 0 -5px; }
+        .content-area .row > [class*="col-"] { padding: 0 5px; height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+
+        /* ===== 左栏 ===== */
+        .left-panel { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+        .left-panel-header { flex-shrink: 0; padding: 10px 14px 7px 14px; border-bottom: 1px solid #F0F0F0; }
+        .left-panel-header .section-label { font-weight: 700; font-size: 0.88rem; color: #2C3E50; }
+        .left-panel-body { flex: 1; overflow-y: auto; padding: 10px 14px 14px 14px; }
+        .left-panel-body::-webkit-scrollbar { width: 4px; }
+        .left-panel-body::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 2px; }
+
+        /* ===== 时间轴（v6 增强选中态） ===== */
+        .timeline { position: relative; padding: 0; list-style: none; }
+        .timeline::before { content: ''; position: absolute; top: 8px; bottom: 8px; left: 14px; width: 2px; background: #E9ECEF; transition: background 0.3s; }
+        .timeline.has-selected::before { background: linear-gradient(to bottom, #4A6FA5 0%, #4A6FA5 var(--selected-pos, 50%), #E9ECEF var(--selected-pos, 50%), #E9ECEF 100%); }
+
+        .timeline-item { position: relative; padding-left: 38px; margin-bottom: 0.85rem; }
+        .timeline-item:last-child { margin-bottom: 0; }
+        .timeline-marker { position: absolute; left: 5px; top: 12px; z-index: 2; }
+        .timeline-dot {
+            width: 18px; height: 18px; border-radius: 50%; background: #fff;
+            border: 3px solid #ADB5BD; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 0 0 3px #fff;
+        }
+        .timeline-item:hover .timeline-dot { transform: scale(1.25); }
+
+        /* 默认状态 */
+        .timeline-marker.completed .timeline-dot { background: #28A745; border-color: #28A745; }
+        .timeline-marker.in_progress .timeline-dot { background: #FFC107; border-color: #FFC107; }
+        .timeline-marker.pending .timeline-dot { background: #fff; border-color: #ADB5BD; }
+        .timeline-marker.skipped .timeline-dot { background: #6C757D; border-color: #6C757D; }
+
+        /* 选中态：圆点放大 + 发光 */
+        .timeline-item.selected .timeline-dot {
+            width: 24px; height: 24px; transform: scale(1); border-width: 4px;
+        }
+        .timeline-item.selected .timeline-marker { left: 2px; top: 10px; }
+        .timeline-marker.completed .timeline-dot { box-shadow: 0 0 0 3px #fff; }
+        .timeline-item.selected .timeline-marker.completed .timeline-dot { box-shadow: 0 0 0 4px #fff, 0 0 12px rgba(40,167,69,0.4); }
+        .timeline-item.selected .timeline-marker.in_progress .timeline-dot { box-shadow: 0 0 0 4px #fff, 0 0 12px rgba(255,193,7,0.4); }
+
+        /* 选中态卡片左侧指示三角 */
+        .timeline-node-card-wrap { position: relative; }
+        .timeline-item.selected .timeline-node-card-wrap::before {
+            content: ''; position: absolute; left: -10px; top: 50%; transform: translateY(-50%);
+            width: 0; height: 0; border-top: 8px solid transparent; border-bottom: 8px solid transparent;
+            border-right: 8px solid #4A6FA5; z-index: 3;
+        }
+
+        /* 节点卡片 */
+        .timeline-node-card {
+            border: 2px solid transparent; border-radius: 8px; background: #F8F9FA;
+            cursor: pointer; transition: all 0.25s ease; padding: 9px 11px;
+        }
+        .timeline-node-card:hover { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.08); transform: translateX(3px); }
+        .timeline-item.selected .timeline-node-card {
+            border-color: #4A6FA5; background: #fff;
+            box-shadow: 0 0 0 3px rgba(74,111,165,0.12), 0 4px 12px rgba(74,111,165,0.1);
+            transform: translateX(3px);
+        }
+        .node-date { font-size: 0.7rem; color: #8C959E; }
+        .node-title { font-weight: 600; font-size: 0.83rem; color: #2C3E50; margin-bottom: 1px; }
+        .node-summary { font-size: 0.73rem; color: #9CA3AA; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 4px; }
+        .node-step-progress { font-size: 0.68rem; color: #8C959E; }
+        .progress-micro { height: 3px; border-radius: 2px; background-color: #E9ECEF; margin-top: 3px; }
+        .progress-micro .progress-bar { border-radius: 2px; }
+        .badge-node { font-size: 0.6rem; font-weight: 600; padding: 0.12em 0.5em; border-radius: 10px; }
+
+        /* ===== 右栏 ===== */
+        .right-panel { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+        .right-panel-body { flex: 1; overflow-y: auto; padding: 14px 18px 18px; }
+        .right-panel-body::-webkit-scrollbar { width: 5px; }
+        .right-panel-body::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 3px; }
+        .right-panel-body::-webkit-scrollbar-track { background: transparent; }
+
+        .node-detail-header { border-bottom: 1px solid #E9ECEF; padding-bottom: 8px; margin-bottom: 10px; }
+        .node-detail-header .nd-title { font-weight: 700; font-size: 1rem; color: #2C3E50; }
+        .nd-header-actions { display: flex; gap: 3px; flex-shrink: 0; }
+        .nd-header-actions .btn-icon {
+            width: 28px; height: 28px; border-radius: 6px; border: 1px solid #E5E7EB;
+            background: #fff; color: #6C757D; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.15s; font-size: 0.8rem;
+        }
+        .nd-header-actions .btn-icon:hover { background: #F3F4F6; color: #4A6FA5; border-color: #4A6FA5; }
+
+        .section-title {
+            font-size: 0.74rem; font-weight: 700; color: #495057; letter-spacing: 0.3px;
+            padding-bottom: 4px; border-bottom: 2px solid #E9ECEF; margin-bottom: 6px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .section-title .title-add-btn {
+            font-size: 0.68rem; font-weight: 600; color: #4A6FA5; cursor: pointer;
+            display: flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 4px;
+            border: none; background: #F0F4FF; transition: all 0.15s;
+        }
+        .section-title .title-add-btn:hover { background: #4A6FA5; color: #fff; }
+
+        /* ===== 步骤卡片 ===== */
+        .step-card { border: 1px solid #F0F0F0; border-radius: 8px; margin-bottom: 6px; transition: all 0.15s; overflow: hidden; }
+        .step-card:hover { border-color: #E5E7EB; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+        .step-card:last-child { margin-bottom: 0; }
+
+        .step-header {
+            display: flex; align-items: flex-start; gap: 8px; padding: 7px 10px;
+            cursor: pointer; user-select: none; transition: background 0.15s;
+        }
+        .step-header:hover { background: #F8FAFB; }
+        .step-checkbox { width: 1.05em; height: 1.05em; cursor: pointer; margin-top: 0.15em; accent-color: #28A745; flex-shrink: 0; }
+        .step-header-content { flex: 1; min-width: 0; }
+        .step-header-top { display: flex; align-items: center; gap: 6px; }
+        .step-title { font-weight: 600; font-size: 0.83rem; color: #2C3E50; }
+        .step-title.completed { text-decoration: line-through; color: #ADB5BD; }
+        .step-status-badge { font-size: 0.6rem; padding: 0.1em 0.45em; border-radius: 10px; font-weight: 600; flex-shrink: 0; }
+        .step-meta { font-size: 0.7rem; color: #9CA3AA; display: flex; gap: 8px; margin-top: 1px; }
+        .step-expand-icon { color: #ADB5BD; font-size: 0.65rem; transition: transform 0.25s; flex-shrink: 0; margin-top: 4px; }
+        .step-card.expanded .step-expand-icon { transform: rotate(180deg); }
+
+        /* 折叠时显示内容预览（v6 新增） */
+        .step-preview { font-size: 0.75rem; color: #ADB5BD; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: none; }
+        .step-card:not(.expanded) .step-preview { display: block; }
+
+        .step-body { border-top: 1px solid #F3F4F6; padding: 9px 11px 11px; display: none; background: #FAFBFC; }
+        .step-card.expanded .step-body { display: block; }
+        .step-desc { font-size: 0.8rem; color: #4B5563; line-height: 1.6; margin-bottom: 8px; }
+
+        /* 附件（蓝色调） */
+        .step-attachments { margin-bottom: 6px; }
+        .step-attachments-label { font-size: 0.7rem; font-weight: 600; color: #4A6FA5; margin-bottom: 3px; }
+        .attachment-list { display: flex; flex-wrap: wrap; gap: 5px; }
+        .attachment-tag {
+            display: inline-flex; align-items: center; gap: 3px;
+            padding: 2px 7px; background: #EFF6FF; border: 1px solid #DBEAFE; border-radius: 5px;
+            font-size: 0.7rem; color: #1E40AF; cursor: default;
+        }
+        .attachment-tag i { color: #4A6FA5; font-size: 0.72rem; }
+        .attachment-tag .file-size { color: #8CB4E8; }
+        .attachment-tag .remove { color: #93C5FD; cursor: pointer; margin-left: 2px; font-size: 0.65rem; }
+        .attachment-tag .remove:hover { color: #DC3545; }
+
+        /* 空附件占位 */
+        .attachment-empty {
+            display: flex; align-items: center; gap: 5px; padding: 4px 8px;
+            border: 1px dashed #D1D5DB; border-radius: 5px; font-size: 0.7rem; color: #9CA3AA;
+            cursor: pointer; transition: all 0.15s; width: fit-content;
+        }
+        .attachment-empty:hover { border-color: #4A6FA5; color: #4A6FA5; background: #F0F4FF; }
+
+        /* 图片（紫色调） */
+        .step-images { margin-bottom: 6px; }
+        .step-images-label { font-size: 0.7rem; font-weight: 600; color: #7C3AED; margin-bottom: 3px; }
+        .image-thumbs { display: flex; gap: 5px; flex-wrap: wrap; }
+        .image-thumb {
+            width: 50px; height: 50px; border-radius: 6px; background: #F5F3FF; border: 1px solid #EDE9FE;
+            display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden;
+            font-size: 0.55rem; font-weight: 600; color: #6D28D9; position: relative;
+        }
+        .image-thumb .img-remove {
+            position: absolute; top: -1px; right: -1px; width: 14px; height: 14px;
+            background: rgba(0,0,0,0.45); border-radius: 50%; color: #fff;
+            font-size: 0.45rem; display: none; align-items: center; justify-content: center;
+        }
+        .image-thumb:hover .img-remove { display: flex; }
+        .add-image-btn {
+            width: 50px; height: 50px; border-radius: 6px; border: 1px dashed #D1D5DB;
+            background: #FAFBFC; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: #9CA3AA; font-size: 1.1rem; transition: all 0.15s;
+        }
+        .add-image-btn:hover { border-color: #7C3AED; color: #7C3AED; background: #F5F3FF; }
+
+        .step-result { margin-bottom: 4px; }
+        .step-result-label { font-size: 0.7rem; font-weight: 600; color: #6C757D; margin-bottom: 2px; }
+        .step-result-text {
+            font-size: 0.78rem; color: #4B5563; background: #F0FDF4; border: 1px solid #DCFCE7;
+            border-radius: 5px; padding: 5px 9px;
+        }
+        .step-result-text.empty { background: #FAFBFC; border-color: #E5E7EB; color: #9CA3AA; font-style: italic; }
+
+        .step-actions { display: flex; gap: 5px; margin-top: 6px; }
+        .step-actions .btn-sm { font-size: 0.7rem; padding: 0.12rem 0.45rem; }
+
+        /* 空步骤列表占位（v6 新增） */
+        .empty-step-placeholder {
+            text-align: center; padding: 24px 16px; color: #9CA3AA;
+        }
+        .empty-step-placeholder i { font-size: 2rem; color: #D1D5DB; margin-bottom: 8px; display: block; }
+        .empty-step-placeholder p { font-size: 0.82rem; margin-bottom: 8px; }
+
+        /* ===== 操作记录 Offcanvas（v6 精简圆点颜色） ===== */
+        .offcanvas-log { --bs-offcanvas-width: 380px; }
+        .offcanvas-log .offcanvas-header { border-bottom: 1px solid #F0F0F0; padding: 14px 18px; }
+        .offcanvas-log .offcanvas-body { padding: 10px 18px; }
+
+        .log-entry { position: relative; padding-left: 26px; padding-bottom: 14px; }
+        .log-entry:last-child { padding-bottom: 0; }
+        .log-entry::before {
+            content: ''; position: absolute; left: 7px; top: 16px; bottom: 0;
+            width: 1px; background: #E9ECEF;
+        }
+        .log-entry:last-child::before { display: none; }
+        .log-dot {
+            position: absolute; left: 1px; top: 3px; width: 13px; height: 13px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 0.5rem; color: #fff; z-index: 1;
+        }
+        /* 精简为4色 */
+        .log-dot.type-create { background: #4A6FA5; }     /* 创建类：蓝 */
+        .log-dot.type-update { background: #F59E0B; }     /* 更新类：琥珀 */
+        .log-dot.type-complete { background: #28A745; }   /* 完成类：绿 */
+        .log-dot.type-problem { background: #DC3545; }    /* 问题类：红 */
+
+        .log-content-text { font-size: 0.8rem; color: #4B5563; }
+        .log-time { font-size: 0.67rem; color: #9CA3AA; margin-top: 1px; }
+        .log-group-label { font-size: 0.7rem; font-weight: 700; color: #ADB5BD; padding: 6px 0 3px 0; letter-spacing: 0.3px; }
+
+        /* 添加步骤虚线按钮 */
+        .add-step-fab {
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+            width: 100%; padding: 6px; margin-top: 6px;
+            border: 1px dashed #D1D5DB; border-radius: 8px; background: #FAFBFC;
+            color: #6C757D; font-size: 0.8rem; cursor: pointer; transition: all 0.15s;
+        }
+        .add-step-fab:hover { border-color: #4A6FA5; color: #4A6FA5; background: #F0F4FF; }
+
+        .version-badge { position: fixed; bottom: 12px; right: 12px; background: rgba(74,111,165,0.85); color: #fff; padding: 3px 10px; border-radius: 14px; font-size: 0.68rem; font-weight: 600; z-index: 999; box-shadow: 0 2px 6px rgba(0,0,0,0.12); }
+
+        @media (max-width: 991.98px) {
+            .content-area .row { flex-direction: column; overflow-y: auto; }
+            .content-area .row > [class*="col-"] { height: auto; min-height: 260px; margin-bottom: 8px; }
+            .left-panel, .right-panel { max-height: 360px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="page-wrapper">
+
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-xmgj">
+        <div class="container-fluid px-3">
+            <a class="navbar-brand" href="#"><i class="bi bi-kanban me-2"></i>项目管家</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navMenu">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item"><a class="nav-link" href="#">仪表盘</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="#">事项列表</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#">新建事项</a></li>
+                    <li class="nav-item dropdown ms-2">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle me-1"></i> 张三
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#">退出登录</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <div class="header-area container-fluid px-3">
+        <div class="compact-header d-flex align-items-center gap-3">
+            <a href="#" class="back-link d-flex align-items-center gap-1"><i class="bi bi-arrow-left"></i> 返回</a>
+            <div class="header-divider"></div>
+            <div class="header-title-area">
+                <span class="item-title">企业官网建设项目</span>
+                <span class="tag" style="background:#D4EDDA;color:#155724;"><i class="bi bi-check-circle-fill me-1" style="font-size:0.5rem;"></i>进行中</span>
+                <span class="tag" style="background:#FFF3CD;color:#856404;"><i class="bi bi-exclamation-triangle-fill me-1" style="font-size:0.5rem;"></i>高</span>
+                <span class="item-desc ms-2">负责公司官网从设计到开发上线的全流程跟进</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 内容区 -->
+    <div class="content-area container-fluid px-3">
+        <div class="row">
+
+            <!-- 左栏 30% -->
+            <div class="col-lg-4">
+                <div class="left-panel">
+                    <div class="left-panel-header d-flex justify-content-between align-items-center">
+                        <span class="section-label"><i class="bi bi-clock-history me-2" style="color:#4A6FA5;"></i>时间轴</span>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-outline-primary btn-sm" style="font-size:0.72rem;padding:0.12rem 0.4rem;" title="编辑事项"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-primary btn-sm" style="font-size:0.72rem;padding:0.12rem 0.5rem;" title="添加节点"><i class="bi bi-plus-lg"></i></button>
+                        </div>
+                    </div>
+                    <div class="left-panel-body">
+                        <div class="timeline has-selected" style="--selected-pos: 33%;">
+
+                            <!-- 节点1：已完成 -->
+                            <div class="timeline-item">
+                                <div class="timeline-marker completed"><div class="timeline-dot"></div></div>
+                                <div class="timeline-node-card-wrap">
+                                    <div class="timeline-node-card">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="node-date"><i class="bi bi-calendar3 me-1"></i>05-20</span>
+                                            <span class="badge badge-node bg-success">已完成</span>
+                                        </div>
+                                        <div class="node-title">需求调研与竞品分析</div>
+                                        <div class="node-summary">完成10家竞品分析，整理需求文档初稿</div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="node-step-progress"><i class="bi bi-check2-square me-1"></i>3/3</span>
+                                            <span class="text-success" style="font-size:0.65rem;"><i class="bi bi-check-all"></i></span>
+                                        </div>
+                                        <div class="progress progress-micro"><div class="progress-bar bg-success" style="width:100%"></div></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 节点2：进行中【选中状态-增强】 -->
+                            <div class="timeline-item selected">
+                                <div class="timeline-marker in_progress"><div class="timeline-dot"></div></div>
+                                <div class="timeline-node-card-wrap">
+                                    <div class="timeline-node-card">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="node-date"><i class="bi bi-calendar3 me-1"></i>05-25</span>
+                                            <span class="badge badge-node bg-warning text-dark">进行中</span>
+                                        </div>
+                                        <div class="node-title">UI 视觉设计</div>
+                                        <div class="node-summary">首页、关于我们、产品中心等核心页面UI设计</div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="node-step-progress"><i class="bi bi-check2-square me-1"></i>3/5</span>
+                                            <span class="text-warning" style="font-size:0.65rem;">进行中</span>
+                                        </div>
+                                        <div class="progress progress-micro"><div class="progress-bar bg-warning" style="width:60%"></div></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 节点3 -->
+                            <div class="timeline-item">
+                                <div class="timeline-marker pending"><div class="timeline-dot"></div></div>
+                                <div class="timeline-node-card-wrap">
+                                    <div class="timeline-node-card">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="node-date"><i class="bi bi-calendar3 me-1"></i>06-05</span>
+                                            <span class="badge badge-node bg-secondary">待处理</span>
+                                        </div>
+                                        <div class="node-title">前端开发</div>
+                                        <div class="node-summary">基于UI设计稿开发页面，响应式适配</div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="node-step-progress"><i class="bi bi-check2-square me-1"></i>0/4</span>
+                                            <span class="text-secondary" style="font-size:0.65rem;">未开始</span>
+                                        </div>
+                                        <div class="progress progress-micro"><div class="progress-bar" style="width:0%"></div></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 节点4 -->
+                            <div class="timeline-item">
+                                <div class="timeline-marker pending"><div class="timeline-dot"></div></div>
+                                <div class="timeline-node-card-wrap">
+                                    <div class="timeline-node-card">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="node-date"><i class="bi bi-calendar3 me-1"></i>06-15</span>
+                                            <span class="badge badge-node bg-secondary">待处理</span>
+                                        </div>
+                                        <div class="node-title">测试与部署上线</div>
+                                        <div class="node-summary">全功能测试、兼容性测试、部署上线</div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="node-step-progress"><i class="bi bi-check2-square me-1"></i>0/2</span>
+                                            <span class="text-secondary" style="font-size:0.65rem;">未开始</span>
+                                        </div>
+                                        <div class="progress progress-micro"><div class="progress-bar" style="width:0%"></div></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右栏 70% -->
+            <div class="col-lg-8">
+                <div class="right-panel">
+                    <div class="right-panel-body">
+
+                        <!-- 节点头部 -->
+                        <div class="node-detail-header d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <span class="nd-title">UI 视觉设计</span>
+                                    <span class="badge bg-warning text-dark rounded-pill" style="font-size:0.63rem;font-weight:600;">进行中</span>
+                                </div>
+                                <span class="text-muted" style="font-size:0.76rem;"><i class="bi bi-calendar3 me-1"></i>2026-05-25</span>
+                            </div>
+                            <div class="nd-header-actions">
+                                <button class="btn-icon" title="操作记录" data-bs-toggle="offcanvas" data-bs-target="#actionLogDrawer"><i class="bi bi-clock-history"></i></button>
+                                <button class="btn-icon" title="添加步骤"><i class="bi bi-plus-lg"></i></button>
+                                <button class="btn-icon" title="编辑节点"><i class="bi bi-pencil"></i></button>
+                                <button class="btn-icon" title="更多" style="border:none;"><i class="bi bi-three-dots-vertical"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- 概要 -->
+                        <p class="text-muted" style="font-size:0.82rem;margin-bottom:10px;">
+                            基于需求文档进行首页、关于我们、产品中心、新闻动态等核心页面的UI设计，输出高保真原型。
+                        </p>
+
+                        <!-- 进度 -->
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small text-muted mb-1" style="font-size:0.72rem;">
+                                <span>步骤进度</span>
+                                <span><strong>3</strong> / 5</span>
+                            </div>
+                            <div class="progress" style="height:4px;border-radius:2px;background:#E9ECEF;">
+                                <div class="progress-bar bg-warning" style="width:60%;border-radius:2px;"></div>
+                            </div>
+                        </div>
+
+                        <!-- 步骤清单（标题栏含 + 快捷添加） -->
+                        <div class="section-title">
+                            <span><i class="bi bi-check2-square me-1" style="color:#4A6FA5;"></i>步骤清单</span>
+                            <button class="title-add-btn"><i class="bi bi-plus"></i> 添加</button>
+                        </div>
+
+                        <!-- ===== 步骤1：已完成（默认折叠） ===== -->
+                        <div class="step-card">
+                            <div class="step-header" onclick="this.closest('.step-card').classList.toggle('expanded')">
+                                <input type="checkbox" class="step-checkbox" checked>
+                                <div class="step-header-content">
+                                    <div class="step-header-top">
+                                        <span class="step-title completed">确定设计规范与风格定调</span>
+                                        <span class="step-status-badge" style="background:#D4EDDA;color:#155724;">已完成</span>
+                                    </div>
+                                    <div class="step-meta"><span><i class="bi bi-paperclip me-1"></i>2</span><span><i class="bi bi-image me-1"></i>3</span></div>
+                                    <div class="step-preview">确定整体的UI设计规范，包括主色调、字体系统、间距规范、组件样式...</div>
+                                </div>
+                                <span class="step-expand-icon"><i class="bi bi-chevron-down"></i></span>
+                            </div>
+                            <div class="step-body">
+                                <div class="step-desc">确定整体的UI设计规范，包括主色调、字体系统、间距规范、组件样式等，输出设计规范文档供后续页面设计参考。</div>
+                                <div class="step-attachments">
+                                    <div class="step-attachments-label"><i class="bi bi-paperclip me-1"></i>附件</div>
+                                    <div class="attachment-list">
+                                        <span class="attachment-tag"><i class="bi bi-file-earmark-pdf"></i> 设计规范_v2.pdf <span class="file-size">(2.3MB)</span> <span class="remove"><i class="bi bi-x"></i></span></span>
+                                        <span class="attachment-tag"><i class="bi bi-file-earmark-image"></i> 配色参考.png <span class="file-size">(1.1MB)</span> <span class="remove"><i class="bi bi-x"></i></span></span>
+                                    </div>
+                                </div>
+                                <div class="step-images">
+                                    <div class="step-images-label"><i class="bi bi-image me-1"></i>图片</div>
+                                    <div class="image-thumbs">
+                                        <div class="image-thumb" style="background:#EFF6FF;color:#1E40AF;">规范</div>
+                                        <div class="image-thumb" style="background:#FEF3C7;color:#92400E;">色板</div>
+                                        <div class="image-thumb" style="background:#FCE7F3;color:#9D174D;">字体</div>
+                                        <div class="add-image-btn"><i class="bi bi-plus"></i></div>
+                                    </div>
+                                </div>
+                                <div class="step-result">
+                                    <div class="step-result-label"><i class="bi bi-check-circle me-1" style="color:#28A745;"></i>结果</div>
+                                    <div class="step-result-text">设计规范已确认，色板、字体、间距规范全部定稿并在Figma中建立组件库。</div>
+                                </div>
+                                <div class="step-actions">
+                                    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil"></i> 编辑</button>
+                                    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-paperclip"></i> 附件</button>
+                                    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-image"></i> 图片</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ===== 步骤2：已完成 ===== -->
+                        <div class="step-card">
+                            <div class="step-header" onclick="this.closest('.step-card').classList.toggle('expanded')">
+                                <input type="checkbox" class="step-checkbox" checked>
+                                <div class="step-header-content">
+                                    <div class="step-header-top">
+                                        <span class="step-title completed">首页与核心页面UI设计</span>
+                                        <span class="step-status-badge" style="background:#D4EDDA;color:#155724;">已完成</span>
+                                    </div>
+                                    <div class="step-meta"><span><i class="bi bi-paperclip me-1"></i>1</span><span><i class="bi bi-image me-1"></i>5</span></div>
+                                    <div class="step-preview">完成首页、关于我们、产品中心三个核心页面的高保真UI设计...</div>
+                                </div>
+                                <span class="step-expand-icon"><i class="bi bi-chevron-down"></i></span>
+                            </div>
+                            <div class="step-body">
+                                <div class="step-desc">完成首页、关于我们、产品中心三个核心页面的高保真UI设计，包含PC和移动端双端适配稿。</div>
+                                <div class="step-attachments">
+                                    <div class="step-attachments-label"><i class="bi bi-paperclip me-1"></i>附件</div>
+                                    <div class="attachment-list">
+                                        <span class="attachment-tag"><i class="bi bi-file-earmark-figma"></i> 首页设计.fig <span class="file-size">(8.6MB)</span> <span class="remove"><i class="bi bi-x"></i></span></span>
+                                    </div>
+                                </div>
+                                <div class="step-images">
+                                    <div class="step-images-label"><i class="bi bi-image me-1"></i>图片</div>
+                                    <div class="image-thumbs">
+                                        <div class="image-thumb" style="background:#EFF6FF;color:#1E40AF;">首页</div>
+                                        <div class="image-thumb" style="background:#DCFCE7;color:#166534;">关于</div>
+                                        <div class="image-thumb" style="background:#FEF3C7;color:#92400E;">产品</div>
+                                        <div class="image-thumb" style="background:#F5F3FF;color:#6D28D9;">移动</div>
+                                        <div class="image-thumb" style="background:#FCE7F3;color:#9D174D;">移动2</div>
+                                        <div class="add-image-btn"><i class="bi bi-plus"></i></div>
+                                    </div>
+                                </div>
+                                <div class="step-result">
+                                    <div class="step-result-label"><i class="bi bi-check-circle me-1" style="color:#28A745;"></i>结果</div>
+                                    <div class="step-result-text">三页设计已全部通过客户评审，进入切图交付阶段。</div>
+                                </div>
+                                <div class="step-actions">
+                                    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil"></i> 编辑</button>
+                                    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-paperclip"></i> 附件</button>
+                                    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-image"></i> 图片</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ===== 步骤3：进行中【默认展开】 ===== -->
+                        <div class="step-card expanded">
+                            <div class="step-header" onclick="this.closest('.step-card').classList.toggle('expanded')">
+                                <input type="checkbox" class="step-checkbox">
+                                <div class="step-header-content">
+                                    <div class="step-header-top">
+                                        <span class="step-title">产品中心详情页设计</span>
+                                        <span class="step-status-badge" style="background:#FFF3CD;color:#856404;">进行中</span>
+                                    </div>
+                                    <div class="step-meta"><span><i class="bi bi-paperclip me-1"></i>0</span><span><i class="bi bi-image me-1"></i>2</span></div>
+                                    <div class="step-preview">设计产品详情页，包括产品展示区、参数表格、相关推荐模块...</div>
+                                </div>
+                                <span class="step-expand-icon"><i class="bi bi-chevron-down"></i></span>
+                            </div>
+                            <div class="step-body">
+                                <div class="step-desc">设计产品详情页，包括产品展示区、参数表格、相关推荐模块。产品分类部分需根据业务反馈再调整。</div>
+                                <!-- 演示空附件占位 -->
+                                <div class="step-attachments">
+                                    <div class="step-attachments-label"><i class="bi bi-paperclip me-1"></i>附件</div>
+                                    <div class="attachment-empty"><i class="bi bi-plus"></i> 点击或拖拽上传附件</div>
+                                </div>
+                                <div class="step-images">
+                                    <div class="step-images-label"><i class="bi bi-image me-1"></i>图片</div>
+                                    <div class="image-thumbs">
+                                        <div class="image-thumb" style="background:#F5F3FF;color:#6D28D9;">草稿A</div>
+                                        <div class="image-thumb" style="background:#FEF3C7;color:#92400E;">草稿B</div>
+                                        <div class="add-image-btn"><i class="bi bi-plus"></i></div>
+                                    </div>
+                                </div>
+                                <div class="step-result">
+                                    <div class="step-result-label"><i class="bi bi-hourglass-split me-1" style="color:#FFC107;"></i>结果</div>
+                                    <div class="step-result-text">初稿已完成，产品分类部分需再调整，等待业务部反馈。</div>
+                                </div>
+                                <div class="step-actions">
+                                    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil"></i> 编辑</button>
+                                    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-paperclip"></i> 附件</button>
+                                    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-image"></i> 图片</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ===== 步骤4：未开始 ===== -->
+                        <div class="step-card">
+                            <div class="step-header" onclick="this.closest('.step-card').classList.toggle('expanded')">
+                                <input type="checkbox" class="step-checkbox">
+                                <div class="step-header-content">
+                                    <div class="step-header-top">
+                                        <span class="step-title">新闻动态与联系我们页面设计</span>
+                                        <span class="step-status-badge" style="background:#E9ECEF;color:#6C757D;">未开始</span>
+                                    </div>
+                                    <div class="step-preview">设计新闻动态列表页、详情页以及联系我们页面</div>
+                                </div>
+                                <span class="step-expand-icon"><i class="bi bi-chevron-down"></i></span>
+                            </div>
+                            <div class="step-body">
+                                <div class="step-desc">设计新闻动态列表页、详情页以及联系我们页面。</div>
+                                <div class="step-attachments">
+                                    <div class="step-attachments-label"><i class="bi bi-paperclip me-1"></i>附件</div>
+                                    <div class="attachment-empty"><i class="bi bi-plus"></i> 点击或拖拽上传附件</div>
+                                </div>
+                                <div class="step-images">
+                                    <div class="step-images-label"><i class="bi bi-image me-1"></i>图片</div>
+                                    <div class="image-thumbs">
+                                        <div class="add-image-btn"><i class="bi bi-plus"></i></div>
+                                    </div>
+                                </div>
+                                <div class="step-result">
+                                    <div class="step-result-label"><i class="bi bi-hourglass-split me-1" style="color:#9CA3AA;"></i>结果</div>
+                                    <div class="step-result-text empty">尚未开始</div>
+                                </div>
+                                <div class="step-actions">
+                                    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil"></i> 编辑</button>
+                                    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-paperclip"></i> 附件</button>
+                                    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-image"></i> 图片</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ===== 步骤5：受阻 ===== -->
+                        <div class="step-card">
+                            <div class="step-header" onclick="this.closest('.step-card').classList.toggle('expanded')">
+                                <input type="checkbox" class="step-checkbox">
+                                <div class="step-header-content">
+                                    <div class="step-header-top">
+                                        <span class="step-title">移动端适配设计</span>
+                                        <span class="step-status-badge" style="background:#F8D7DA;color:#721C24;">受阻</span>
+                                    </div>
+                                    <div class="step-preview">基于现有设计稿进行移动端适配，确保在所有主流设备上的显示效果</div>
+                                </div>
+                                <span class="step-expand-icon"><i class="bi bi-chevron-down"></i></span>
+                            </div>
+                            <div class="step-body">
+                                <div class="step-desc">基于现有设计稿进行移动端适配，确保在所有主流设备上的显示效果。</div>
+                                <div class="step-attachments">
+                                    <div class="step-attachments-label"><i class="bi bi-paperclip me-1"></i>附件</div>
+                                    <div class="attachment-empty"><i class="bi bi-plus"></i> 点击或拖拽上传附件</div>
+                                </div>
+                                <div class="step-images">
+                                    <div class="step-images-label"><i class="bi bi-image me-1"></i>图片</div>
+                                    <div class="image-thumbs">
+                                        <div class="add-image-btn"><i class="bi bi-plus"></i></div>
+                                    </div>
+                                </div>
+                                <div class="step-result">
+                                    <div class="step-result-label"><i class="bi bi-exclamation-triangle me-1" style="color:#DC3545;"></i>结果</div>
+                                    <div class="step-result-text" style="background:#FEF2F2;border-color:#FECACA;color:#991B1B;">等待UI框架选型确认，技术方案未定无法开展移动端适配工作。</div>
+                                </div>
+                                <div class="step-actions">
+                                    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil"></i> 编辑</button>
+                                    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-paperclip"></i> 附件</button>
+                                    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-image"></i> 图片</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 添加步骤 -->
+                        <div class="add-step-fab"><i class="bi bi-plus-lg"></i> 添加步骤</div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ===== 操作记录 Offcanvas（v6：4色精简+时间线） ===== -->
+<div class="offcanvas offcanvas-end offcanvas-log" tabindex="-1" id="actionLogDrawer">
+    <div class="offcanvas-header">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2" style="color:#4A6FA5;"></i>操作记录</h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body">
+
+        <div class="log-group-label">今天</div>
+        <div class="log-entry">
+            <div class="log-dot type-complete"><i class="bi bi-check"></i></div>
+            <div class="log-content-text">步骤2"关于我们页面设计"状态设为已完成</div>
+            <div class="log-time">14:30 · 张三</div>
+        </div>
+        <div class="log-entry">
+            <div class="log-dot type-update"><i class="bi bi-chat"></i></div>
+            <div class="log-content-text">步骤3添加备注: 产品分类部分需再调整</div>
+            <div class="log-time">10:15 · 张三</div>
+        </div>
+
+        <div class="log-group-label">昨天</div>
+        <div class="log-entry">
+            <div class="log-dot type-problem"><i class="bi bi-exclamation"></i></div>
+            <div class="log-content-text">步骤5"移动端适配设计"状态变更为 <strong>受阻</strong></div>
+            <div class="log-time">16:45 · 张三</div>
+        </div>
+        <div class="log-entry">
+            <div class="log-dot type-create"><i class="bi bi-plus"></i></div>
+            <div class="log-content-text">新增步骤: 移动端适配设计</div>
+            <div class="log-time">14:20 · 张三</div>
+        </div>
+
+        <div class="log-group-label">5月25日</div>
+        <div class="log-entry">
+            <div class="log-dot type-update"><i class="bi bi-pencil"></i></div>
+            <div class="log-content-text">更新节点概要内容</div>
+            <div class="log-time">09:00 · 张三</div>
+        </div>
+        <div class="log-entry">
+            <div class="log-dot type-create"><i class="bi bi-plus"></i></div>
+            <div class="log-content-text">创建节点 "UI 视觉设计"</div>
+            <div class="log-time">09:00 · 张三</div>
+        </div>
+
+    </div>
+</div>
+
+<div class="version-badge">v6</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+{% extends 'xmgj/base.html' %}
+{% load static %}
+
+{% block title %}仪表盘 - 项目管家{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrapper">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0 fw-bold" style="letter-spacing:-0.3px;"><i class="bi bi-speedometer2 me-2" style="color:var(--primary);"></i>仪表盘</h4>
+        <a href="{% url 'xmgj:item_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>新建事项</a>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="row g-3 mb-4">
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="stat-icon" style="background:var(--primary-bg);color:var(--primary);">
+                        <i class="bi bi-kanban"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number">{{ total_items }}</div>
+                        <div class="stat-label">全部事项</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="stat-icon" style="background:var(--warning-bg);color:var(--warning);">
+                        <i class="bi bi-hourglass-split"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number">{{ active_items }}</div>
+                        <div class="stat-label">进行中</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="stat-icon" style="background:var(--success-bg);color:var(--success);">
+                        <i class="bi bi-check-all"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number">{{ completed_items }}</div>
+                        <div class="stat-label">已完成</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="stat-icon" style="background:var(--danger-bg);color:var(--danger);">
+                        <i class="bi bi-exclamation-triangle"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number">{{ urgent_items }}</div>
+                        <div class="stat-label">紧急事项</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近事项 -->
+    <div class="card border-0 shadow-sm" style="border-radius:var(--radius-md);">
+        <div class="card-header bg-white border-bottom-0 d-flex justify-content-between align-items-center pt-3 pb-0 px-3">
+            <h6 class="fw-bold mb-0" style="color:var(--gray-800);font-size:0.9rem;">
+                <i class="bi bi-clock me-1" style="color:var(--primary);"></i> 最近更新
+            </h6>
+            <a href="{% url 'xmgj:item_list' %}" class="btn btn-sm px-3" style="background:var(--primary-bg);color:var(--primary);font-weight:600;border-radius:6px;">查看全部</a>
+        </div>
+        <div class="card-body px-3 py-2">
+            {% if recent_items %}
+            <div class="list-group list-group-flush">
+                {% for item in recent_items %}
+                <a href="{% url 'xmgj:item_detail' item.pk %}" class="list-group-item list-group-item-action px-2 py-2 border-0 d-flex justify-content-between align-items-center" style="border-radius:var(--radius-sm);">
+                    <div class="d-flex align-items-center gap-2">
+                        <span style="width:8px;height:8px;border-radius:50%;background:{% if item.status == 'completed' %}var(--success){% elif item.status == 'in_progress' %}var(--warning){% elif item.status == 'on_hold' %}var(--gray-400){% else %}var(--gray-300){% endif %};flex-shrink:0;"></span>
+                        <span style="font-size:0.88rem;font-weight:500;color:var(--gray-700);">{{ item.title }}</span>
+                        {% if item.status == 'in_progress' %}<span class="badge" style="font-size:0.6rem;background:var(--warning-bg);color:#92400E;">进行中</span>{% endif %}
+                        {% if item.priority == 'urgent' %}<span class="badge" style="font-size:0.6rem;background:var(--danger-bg);color:#991B1B;">紧急</span>{% endif %}
+                    </div>
+                    <small class="text-muted" style="font-size:0.72rem;flex-shrink:0;">{{ item.updated_at|date:"m-d H:i" }}</small>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted" style="font-size:0.85rem;">
+                暂无事项，<a href="{% url 'xmgj:item_create' %}">创建第一个</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

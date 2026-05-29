@@ -1,0 +1,130 @@
+{% extends 'xmgj/base.html' %}
+{% load static xmgj_tags %}
+
+{% block title %}{{ item.title }} - 项目管家{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="header-area container-fluid px-3">
+    <div class="compact-header d-flex align-items-center gap-3">
+        <a href="{% url 'xmgj:item_list' %}" class="back-link d-flex align-items-center gap-1">
+            <i class="bi bi-arrow-left"></i> 返回
+        </a>
+        <div class="header-divider"></div>
+        <div class="header-title-area">
+            <span class="item-title">{{ item.title }}</span>
+            <span class="tag-item" style="background:{% if item.status == 'completed' %}var(--success-bg);color:#166534{% elif item.status == 'in_progress' %}var(--warning-bg);color:#92400E{% elif item.status == 'on_hold' %}var(--gray-100);color:var(--gray-500){% else %}var(--gray-100);color:var(--gray-500){% endif %};">
+                <i class="bi bi-check-circle-fill me-1" style="font-size:0.5rem;"></i>{{ item.get_status_display }}
+            </span>
+            <span class="tag-item" style="background:{% if item.priority == 'urgent' %}var(--danger-bg);color:#991B1B{% elif item.priority == 'high' %}var(--warning-bg);color:#92400E{% elif item.priority == 'medium' %}var(--primary-bg);color:var(--primary){% else %}var(--gray-100);color:var(--gray-500){% endif %};">
+                <i class="bi bi-exclamation-triangle-fill me-1" style="font-size:0.5rem;"></i>{{ item.get_priority_display }}
+            </span>
+            {% if item.description %}
+            <span class="item-desc ms-2">{{ item.description }}</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 内容区 -->
+<div class="content-area container-fluid px-3">
+    <div class="row">
+
+        <!-- 左栏 30% -->
+        <div class="col-lg-4">
+            <div class="left-panel">
+                <div class="left-panel-header d-flex justify-content-between align-items-center">
+                    <span class="panel-title"><i class="bi bi-clock-history me-2" style="color:var(--primary);"></i>时间轴</span>
+                    <div class="d-flex gap-1">
+                        <a href="{% url 'xmgj:item_edit' item.pk %}" class="btn btn-outline-primary btn-sm" title="编辑事项"><i class="bi bi-pencil"></i></a>
+                        <a href="{% url 'xmgj:node_create' item.pk %}" class="btn btn-primary btn-sm" title="添加节点"><i class="bi bi-plus-lg"></i></a>
+                    </div>
+                </div>
+                <div class="left-panel-body">
+                    {% if timeline_nodes %}
+                    <div class="timeline" id="timeline">
+                        {% for node in timeline_nodes %}
+                        {% include 'xmgj/includes/node_card.html' with node=node selected_pk=selected_node.pk %}
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="bi bi-clock-history"></i>
+                        <p>暂无时间轴节点</p>
+                        <a href="{% url 'xmgj:node_create' item.pk %}" class="btn btn-primary btn-sm">添加第一个节点</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 右栏 70% -->
+        <div class="col-lg-8">
+            <div class="right-panel">
+                <div class="right-panel-body" id="node-detail-container">
+                    {% if selected_node %}
+                        {% include 'xmgj/includes/node_detail_panel.html' with node=selected_node %}
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="bi bi-arrow-left-circle"></i>
+                        <p>点击左侧时间轴上的节点查看详情</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // 时间轴节点点击 → AJAX 加载详情
+    document.querySelectorAll('.timeline-node-card').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var url = this.dataset.detailUrl;
+            if (!url) return;
+
+            // 高亮选中
+            document.querySelectorAll('.timeline-item.selected').forEach(function(s) {
+                s.classList.remove('selected');
+            });
+            this.closest('.timeline-item').classList.add('selected');
+
+            // 加载详情
+            fetch(url, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(function(r) { return r.text(); })
+            .then(function(html) {
+                document.getElementById('node-detail-container').innerHTML = html;
+                // 重新绑定新加载的步骤头点击事件
+                document.querySelectorAll('#node-detail-container .step-header').forEach(function(h) {
+                    h.addEventListener('click', function() {
+                        this.closest('.step-card').classList.toggle('expanded');
+                    });
+                });
+                // 重新绑定复选框
+                document.querySelectorAll('#node-detail-container .step-checkbox').forEach(function(cb) {
+                    cb.addEventListener('change', function() {
+                        var url = this.dataset.url;
+                        if (!url) return;
+                        var status = this.checked ? 'completed' : 'not_started';
+                        var formData = new FormData();
+                        formData.append('status', status);
+                        formData.append('csrfmiddlewaretoken', getCsrfToken());
+                        fetch(url, {
+                            method: 'POST',
+                            body: formData,
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                    });
+                });
+            });
+        });
+    });
+</script>
+{% endblock %}

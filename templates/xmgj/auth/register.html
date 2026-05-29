@@ -1,0 +1,36 @@
+{% extends 'xmgj/base.html' %}
+
+{% block title %}注册 - 项目管家{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 py-5" style="flex:1;overflow-y:auto;">
+    <div class="row justify-content-center">
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0" style="border-radius:10px;">
+                <div class="card-body p-4">
+                    <div class="text-center mb-4">
+                        <i class="bi bi-kanban" style="font-size:2rem;color:#4A6FA5;"></i>
+                        <h5 class="fw-bold mt-2" style="color:#2C3E50;">注册新账号</h5>
+                    </div>
+                    <form method="post">
+                        {% csrf_token %}
+                        {% for field in form %}
+                        <div class="mb-3">
+                            <label class="form-label" style="font-size:0.85rem;font-weight:600;">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.errors %}
+                            <div class="text-danger" style="font-size:0.78rem;">{{ field.errors }}</div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        <button type="submit" class="btn btn-primary w-100">注册</button>
+                    </form>
+                    <div class="text-center mt-3">
+                        <small class="text-muted">已有账号？<a href="{% url 'xmgj:login' %}">登录</a></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
